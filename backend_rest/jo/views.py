@@ -34,9 +34,10 @@ class JoFetchToken(APIView):
         if username and password:
             client_id = oauth_conf['client_id']
             client_secret = oauth_conf['client_secret']
+            oauth_url = oauth_conf['oauth_url']
             data = f'username={username}&password={password}&grant_type=password&client_id={client_id}&client_secret={client_secret}'
             headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-            res = requests.post("http://localhost:8000/api/oauth2/token/", data=data, headers=headers)
+            res = requests.post(oauth_url, data=data, headers=headers)
             content = json.loads(res.content)
             if 'access_token' in content:
                 return Response({"statusCode": 200, "statusMessage": "Successfully fetched token", "result": json.loads(res.content)})
