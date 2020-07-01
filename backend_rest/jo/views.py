@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.contrib.auth.models import User
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import permissions
 from . import models
 import datetime
 import requests
@@ -24,7 +25,7 @@ oauth_conf = get_conf()
 
 
 class JoFetchToken(APIView):
-    permission_classes = []
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         username = request.data['username'] if 'username' in request.data else None
@@ -46,7 +47,7 @@ class JoFetchToken(APIView):
 
 
 class JoAPI(APIView):
-    permission_classes = []
+    permission_classes = [permissions.IsAuthenticated]
 
     def str_date_to_fmt(self, dt_obj):
         # dt_obj = datetime.datetime.strptime(dt_str, '%Y-%m-%dT%H:%M:%SZ')
@@ -74,39 +75,40 @@ class JoAPI(APIView):
             approval = []
             for appr in models.Joauthoriser.objects.filter(jo_id=row.jo_id):
                 approval.append({
-                    'Approval Status': appr.jostatus,
+                    'ApprovalStatus': appr.jostatus,
                     'Approver': appr.joauthoriseremail,
-                    'Approval Date': self.str_date_to_fmt(appr.joapproveddate),
+                    'ApprovalDate': self.str_date_to_fmt(appr.joapproveddate),
                 })
             sys_changed = []
             sys_sql = f'SELECT f.af_ne_id, e.* from jo_affected_ne f left join jo_network_elements e on f.af_ne_id = e.ne_id where f.af_jo_id = %s'
             for ne in models.JoAffectedNe.objects.raw(sys_sql, [row.jo_id]):
                 sys_changed.append({
-                    'System Name': ne.ne_commonname,
-                    'Ip Address': ne.ne_ip,
+                    'SystemName': ne.ne_commonname,
+                    'IpAddress': ne.ne_ip,
                 })
             data.append({
                 'Identifier': row.jo_id,
                 'Requestor': row.fullname,
-                'Requestor Email': row.requestor,
-                'Requestor Department': row.joDivision,
-                'Request Date': self.str_date_to_fmt(row.thedate),
-                'CAB Ref Number': row.support_ref_number,
-                'JO Number': row.jo_number,
-                'JO Type': row.job_status,
-                'JOB Title': row.subject,
+                'RequestorEmail': row.requestor,
+                'RequestorDepartment': row.joDivision,
+                'RequestDate': self.str_date_to_fmt(row.thedate),
+                'CABRefNumber': row.support_ref_number,
+                'JONumber': row.jo_number,
+                'JOType': row.job_status,
+                'JOBTitle': row.subject,
                 'Approval': approval,
-                'Systems to be changed': sys_changed,
-                'Mitigation Plan': row.mitigation_in_place,
+                'SystemsToBeChanged': sys_changed,
+                'MitigationPlan': row.mitigation_in_place,
             })
         return data
 
     def post(self, request):
+        print("API User: ", request.user)
         params = request.data['Params'] if 'Params' in request.data else None
         if params:
-            ip_address = params['IP Address'] if 'IP Address' in params else None
-            start_date = params['Start Date'] if 'Start Date' in params else None
-            start_jo = params['Start JO'] if 'Start JO' in params else None
+            ip_address = params['IPAddress'] if 'IPAddress' in params else None
+            start_date = params['StartDate'] if 'StartDate' in params else None
+            start_jo = params['StartJO'] if 'StartJO' in params else None
         data = self.get_data(ip_address, start_date, start_jo)
         return Response({
             'statusCode': 200,
