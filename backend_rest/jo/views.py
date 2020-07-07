@@ -56,18 +56,14 @@ class JoAPI(APIView):
         new_dt_str = dt_obj.strftime('%Y-%m-%d')
         return new_dt_str
 
-    def get_data(self, ip_address=None, start_date=None, start_jo=None, range_hours=None):
-        print(f'IP: {ip_address}, Date: {start_date}, StartJO: {start_jo}, RangeHours: {range_hours}')
+    def get_data(self, ip_address=None, start_date=None, range_hours=None):
+        print(f'IP: {ip_address}, Date: {start_date}, RangeHours: {range_hours}')
         sql = "SELECT u.fullname, u.joDivision, j.* FROM `jobs` j left join users u on j.requestor = u.username where j.jobstatus in ('BROADCASTED','SUCCESSFUL','UNSUCCESSFUL','ONGOING','PAUSED')"
         params = []
 
         if start_date:
             sql = f'{sql} and thedate >= %s '
             params.append(f'20{start_date}')
-
-        if start_jo:
-            sql = f'{sql} and j.jo_id >= %s '
-            params.append(start_jo)
 
         if range_hours:
             d = datetime.today() - timedelta(hours=range_hours)
@@ -130,9 +126,8 @@ class JoAPI(APIView):
         if params:
             ip_address = params['IPAddress'] if 'IPAddress' in params else None
             start_date = params['StartDate'] if 'StartDate' in params else None
-            start_jo = params['StartJO'] if 'StartJO' in params else None
-            range_hours = params['RangeHours'] if 'RangeHours' in params else None
-        data = self.get_data(ip_address, start_date, start_jo, range_hours)
+            range_hours = params['LastNHours'] if 'LastNHours' in params else None
+        data = self.get_data(ip_address, start_date, range_hours)
         return Response({
             'statusCode': 200,
             'statusMessage': f'Success',
