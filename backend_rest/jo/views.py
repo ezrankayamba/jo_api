@@ -114,8 +114,8 @@ class JoAPI(APIView):
                 'Approval': approval,
                 'JOCategory': row.change_type,
                 'Purpose': row.purpose,
-                'SystemsImpacted': row.purpose,
-                'SystemsToBeChanged': row.affected_network_element,
+                'SystemsImpacted': row.affected_network_element,
+                'SystemsToBeChanged': sys_changed,
                 'MitigationPlan': row.mitigation_in_place,
             })
         return data
