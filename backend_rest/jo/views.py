@@ -52,40 +52,46 @@ class JoAPI(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def str_date_to_fmt(self, dt_obj):
-        # dt_obj = datetime.datetime.strptime(dt_str, '%Y-%m-%dT%H:%M:%SZ')
         new_dt_str = dt_obj.strftime('%Y-%m-%d')
         return new_dt_str
 
     def get_data(self, ip_address=None, start_date=None, range_hours=None):
         print(f'IP: {ip_address}, Date: {start_date}, RangeHours: {range_hours}')
-        sql = "SELECT u.fullname, u.joDivision, j.* FROM `jobs` j left join users u on j.requestor = u.username where j.jobstatus in ('BROADCASTED','SUCCESSFUL','UNSUCCESSFUL','ONGOING','PAUSED')"
+        sql = "SELECT u.fullname, u.joDivision, j.* FROM `jobs` j left join users u on j.requestor = u.username where j.jobstatus in ('BROADCASTED', 'SUCCESSFUL', 'UNSUCCESSFUL', 'ONGOING', 'PAUSED', 'POSTPONED', 'CANCELLED')"
         params = []
-
-        if start_date:
-            sql = f'{sql} and thedate >= %s '
-            params.append(f'20{start_date}')
 
         if range_hours:
             d = datetime.today() - timedelta(hours=range_hours)
             new_start_date = d.strftime('%Y-%m-%d %H:%M:%S')
-            sql = f'{sql} and thedate >= %s '
-            params.append(f'{new_start_date}')
+        else:
+            new_start_date = start_date
+
+        if new_start_date:
+            sql = f"{sql} and ((j.jobstatus = 'PAUSED') or (j.jobstatus = 'BROADCASTED' and broadcastDate >= %s) or (j.jobstatus in ('SUCCESSFUL', 'UNSUCCESSFUL', 'ONGOING', 'POSTPONED', 'CANCELLED') and executionComment >= %s)) "
+            params.extend([f'20{new_start_date}'] * 2)
 
         rs = models.Jobs.objects.raw(sql, params)
         data = []
         for row in rs:
             approval = []
             disapproved = False
+            disapproved_date = None
             for appr in models.Joauthoriser.objects.filter(jo_id=row.jo_id).order_by('joapproveddate'):
+                approval_date = self.str_date_to_fmt(appr.joapproveddate)
                 approval.append({
                     'ApprovalStatus': appr.jostatus,
                     'Approver': appr.joauthoriseremail,
-                    'ApprovalDate': self.str_date_to_fmt(appr.joapproveddate),
+                    'ApprovalDate': approval_date,
                 })
                 if appr.jostatus == 'DISAPPROVED':
                     disapproved = True
-            if row.jobstatus == 'PAUSED' and not disapproved:
-                continue
+                    disapproved_date = approval_date
+
+            if row.jobstatus == 'PAUSED':
+                if not disapproved:
+                    continue
+                if new_start_date and new_start_date > approval_date:
+                    continue
 
             sys_changed = []
             sys_sql = f'SELECT f.af_ne_id, e.* from jo_affected_ne f left join jo_network_elements e on f.af_ne_id = e.ne_id where f.af_jo_id = %s'
@@ -117,6 +123,8 @@ class JoAPI(APIView):
                 'SystemsImpacted': row.affected_network_element,
                 'SystemsToBeChanged': sys_changed,
                 'MitigationPlan': row.mitigation_in_place,
+                'StartTime': row.start_time.strftime('%Y-%m-%d %H:%m'),
+                'EndTime': row.end_time.strftime('%Y-%m-%d %H:%m'),
             })
         return data
 
